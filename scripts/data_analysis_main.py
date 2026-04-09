@@ -157,3 +157,10 @@ if __name__ == "__main__":
 
     print("\nAnalysis complete")
     # print(f"All outputs saved in {fig_dir.resolve()}")
+
+
+# Additional analysis: mesh stability and quality metrics
+
+from mesh_stability_analysis import analyze_meshes
+
+analyze_meshes(config.MODELS_TO_COMPARE)

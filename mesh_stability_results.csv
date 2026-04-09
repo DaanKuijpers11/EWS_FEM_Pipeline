@@ -1,0 +1,2 @@
+model,mesh_success,febio_success,n_nodes,n_elements,n_vtk_files,mesh_density
+density_100,True,True,5064,3012,1,100

@@ -7,8 +7,7 @@ color schemes, and literature reference values for use throughout the pipeline.
 from pathlib import Path
 
 # ==================== PATHS ====================
-BASE_DIR = Path(
-    "/Users/ryanengels/Documents/limebv-ews_fem_pipeline-e5fe835fd1bf")
+BASE_DIR = Path("C:\\Users\\20223231\\OneDrive - TU Eindhoven\\Documents\\Word documenten\\Master Jaar 1\\Q4 - Stage\\Github EWS-Pipeline-FEM")
 
 # Directories for each model to be compared in the analysis
 MODELS_TO_COMPARE = {
