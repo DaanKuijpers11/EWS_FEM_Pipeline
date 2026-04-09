@@ -1,6 +1,6 @@
 [model.mesh]
 ls = 0.005
-density = 260
+density = 100
 optimize = true
 order = 2
 

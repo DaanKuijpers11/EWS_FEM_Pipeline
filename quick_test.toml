@@ -158,7 +158,7 @@ cmax = 100000.0
 n_steps = 10
 
 [simulation.parabolic_jump]
-max_height = 0.005
+max_height = 0.01
 n_steps = 51
 
 [simulation.animation]
