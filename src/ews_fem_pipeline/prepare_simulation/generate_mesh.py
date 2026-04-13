@@ -1,3 +1,8 @@
+print("ENTERED generate_mesh()")
+import sys
+sys.stdout.flush()
+
+
 import math
 import numpy as np
 import logging
@@ -15,6 +20,7 @@ def generate_mesh(settings: Settings()):
     and geometry classes. These settings are explained in detail in model_settings.py under the MeshSettings and GeometrySettings
     classes.
     """
+    print("generate_mesh() STARTED")
 
     mesh_parts = MeshParts()
 
@@ -153,6 +159,36 @@ def generate_mesh(settings: Settings()):
             mesh.optimize()
         else:
             mesh.optimize("HighOrder")
+
+    # =============================
+    # MESH VALIDATION (ADDED - Daan)
+    # =============================
+
+    print("\n--- MESH QUALITY CHECK ---")
+
+    try:
+        jacobians = gmsh.model.mesh.getJacobians()[0]
+        min_jac = float(min(jacobians))
+    except Exception as e:
+        print(f"Jacobian check failed: {e}")
+        min_jac = None
+
+    try:
+        qualities = gmsh.model.mesh.getElementQualities()
+        min_q = float(min(qualities)) if qualities else None
+    except Exception as e:
+        print(f"Quality check failed: {e}")
+        min_q = None
+
+    print(f"Min Jacobian: {min_jac}")
+    print(f"Min Element Quality: {min_q}")
+
+    # HARD FAIL CONDITION
+    if min_jac is not None and min_jac <= 0:
+        raise ValueError(f"❌ Invalid mesh! Negative Jacobian detected: {min_jac}")
+
+    if min_q is not None and min_q < 0.05:
+        print("⚠️ Warning: very low element quality")
 
     # Here we loop over the tissues and assign the nodes, elements, etc. to the different fields.
     for name in tissues.model_fields:
