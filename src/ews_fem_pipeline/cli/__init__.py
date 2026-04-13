@@ -36,7 +36,7 @@ def cli_main():
         executable=False,
     ),
 )
-def generate(input_files: tuple[Path, ...]):
+def generated(input_files: tuple[Path, ...]):
     """
     Generates the mesh and writes them to the input .feb file.
     This file is written in the same directory as the input file.
@@ -52,6 +52,9 @@ def generate(input_files: tuple[Path, ...]):
     The code then writes another .toml file containing all settings that ultimately run the simulation; this is
     for reproducing purposes. This .toml is placed in the subdirectory "/output".
     """
+
+    print("🔥 ENTERED CLI GENERATE")
+    print("INPUT FILES:", input_files)
 
     feb_files = []
     for filepath in input_files:
