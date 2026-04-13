@@ -36,7 +36,7 @@ def cli_main():
         executable=False,
     ),
 )
-def generated(input_files: tuple[Path, ...]):
+def generate(input_files: tuple[Path, ...]):
     """
     Generates the mesh and writes them to the input .feb file.
     This file is written in the same directory as the input file.
