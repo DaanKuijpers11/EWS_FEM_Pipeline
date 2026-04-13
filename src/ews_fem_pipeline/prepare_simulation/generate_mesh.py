@@ -20,7 +20,12 @@ def generate_mesh(settings: Settings()):
     and geometry classes. These settings are explained in detail in model_settings.py under the MeshSettings and GeometrySettings
     classes.
     """
-    print("generate_mesh() STARTED")
+
+    import sys
+    sys.stderr.write("🔥 STDERR TEST\n")
+    sys.stderr.flush()
+
+    logger.info("generate_mesh() STARTED")
 
     mesh_parts = MeshParts()
 

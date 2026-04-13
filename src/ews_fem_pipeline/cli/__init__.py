@@ -246,3 +246,6 @@ def run(input_files: tuple[Path, ...], jobs: int):
     feb_files = generate.callback(input_files)
     output_files = fem.callback(feb_files, jobs)
     convert.callback(output_files)
+
+if __name__ == "__main__":
+    cli_main()
