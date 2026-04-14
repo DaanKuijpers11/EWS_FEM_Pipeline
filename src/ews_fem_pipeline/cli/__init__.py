@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from pathlib import Path
 import click
 
@@ -5,6 +6,8 @@ from ews_fem_pipeline.__about__ import __version__
 from ews_fem_pipeline.run_simulation import FEBioRunner
 from ews_fem_pipeline.prepare_simulation import write_to_feb, generate_mesh, Settings, load_settings_from_toml, write_settings_to_toml
 from ews_fem_pipeline.convert_simulation import feb_to_blender
+
+from ews_fem_pipeline.core.pipeline import run_pipeline
 
 
 @click.group(
@@ -52,15 +55,15 @@ def generate(input_files: tuple[Path, ...]):
     The code then writes another .toml file containing all settings that ultimately run the simulation; this is
     for reproducing purposes. This .toml is placed in the subdirectory "/output".
     """
-
-    print("🔥 ENTERED CLI GENERATE")
-    print("INPUT FILES:", input_files)
+    
+    click.echo("\nStarting mesh generation...")
 
     feb_files = []
     for filepath in input_files:
         # Load all non-default settings. Settings that are not parsed, are set to their default value.
         settings = load_settings_from_toml(filepath=filepath)
 
+        print('Starting mesh generation for file: ' + str(filepath))
         # Write a .toml file that contains all settings for reproduction purposes. This will be put in the subdirectory
         # "/output" with name "<filename>_all_settings.toml".
         name_toml = filepath.stem + "_all_settings" + filepath.suffix
@@ -116,6 +119,7 @@ def fem(input_files: tuple[Path, ...], jobs: int):
     Each input file should be of the .feb format.
     Multiple input files can be specified (space separated), in which case these are all simulated.
     """
+    click.echo("\nPerforming FEM simulation(s)...")
 
     for filepath in input_files:
         assert filepath.suffix == ".feb", f"The input file does not have the correct file extension. Must be .feb"
@@ -157,6 +161,8 @@ def convert(input_files: tuple[Path, ...]):
     Each input file should be of the .feb format
     Multiple input files can be specified (space separated), in which case these are all converted.
     """
+    click.echo("\nConverting .vtk files to Blender compatible files...")
+
     for filepath in input_files:
         feb_to_blender(filepath)
 
@@ -189,35 +195,12 @@ def write_default_settings(filepath: Path):
 
 
 @cli_main.command()
-@click.argument(
-    "input_files",
-    nargs=-1,
-    type=click.Path(
-        exists=False,
-        file_okay=True,
-        dir_okay=False,
-        writable=False,
-        readable=True,
-        resolve_path=True,
-        allow_dash=False,
-        path_type=Path,
-        executable=False,
-    ),
-)
-@click.option(
-    "-j", "--jobs",
-    type=click.IntRange(min=0),
-    default=0,
-    help="Control parallelization; switches between (j>1) external (running multiple FEBio "
-         "instances, at max j parallel instances) and (j=1) internal parallelization (allowing "
-         "FEBio to use multiple threads). If j=0 (default), parallelization depends on the number "
-         "of provided feb files: if 1 it chooses internal parallelization, if more than 1 external "
-         "(maximum 4 instances).",
-)
-def run(input_files: tuple[Path, ...], jobs: int):
+@click.argument("input_files", nargs=-1, type=click.Path(path_type=Path))
+@click.option("-j", "--jobs", default=0)
+def run(input_files, jobs):
     """
-    Runs the full FEM pipeline.
-
+    Run full FEM pipeline
+    
     The pipeline is run on the provided input file(s).
     Each input file should be of the .toml format.
     Multiple input files can be specified (space separated), in which all simulations are run for these input files.
@@ -243,9 +226,9 @@ def run(input_files: tuple[Path, ...], jobs: int):
     from.
 
     """
-    feb_files = generate.callback(input_files)
-    output_files = fem.callback(feb_files, jobs)
-    convert.callback(output_files)
+    click.echo("\nPerforming full FEM pipeline...")
+    run_pipeline(list(input_files), jobs)
+
 
 if __name__ == "__main__":
     cli_main()

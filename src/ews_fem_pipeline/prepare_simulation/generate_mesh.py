@@ -1,48 +1,27 @@
-print("ENTERED generate_mesh()")
-import sys
-sys.stdout.flush()
-
-
 import math
 import numpy as np
-import logging
 
 import gmsh
 
 from ews_fem_pipeline.prepare_simulation import MeshParts, Settings
 
-logger = logging.getLogger(__name__)
-
-
 def generate_mesh(settings: Settings()):
     """
-    In this function, the mesh is generated from settings extracted from the Settings class, in particular the mesh
-    and geometry classes. These settings are explained in detail in model_settings.py under the MeshSettings and GeometrySettings
-    classes.
+    In this function, the mesh is generated from settings extracted from the Settings class.
+    These settings are explained in detail in model_settings.py under MeshSettings and GeometrySettings.
     """
-
-    import sys
-    sys.stderr.write("🔥 STDERR TEST\n")
-    sys.stderr.flush()
-
-    logger.info("generate_mesh() STARTED")
+    print("\nStarting mesh generation...")
 
     mesh_parts = MeshParts()
 
     gmsh.initialize()
     gmsh.model.add("breast")
-    # Set option to save all elements in mesh
+
     gmsh.option.setNumber("Mesh.SaveAll", 1)
-    # Set option to suppress all output of the mesher to the console.
-    gmsh.option.setNumber("General.Verbosity", 0)
+    gmsh.option.setNumber("General.Verbosity", 2)
 
-    # Dimension of object
-    dim0 = 0
-    dim1 = 1
-    dim2 = 2
-    dim3 = 3
+    dim0, dim1, dim2, dim3 = 0, 1, 2, 3
 
-    # Rename objects to alias
     build = gmsh.model.occ
     mesh = gmsh.model.mesh
 
@@ -50,23 +29,27 @@ def generate_mesh(settings: Settings()):
     # Construct breast quadrant #
     #############################
 
-    p1 = build.addPoint(0, 0, 0, settings.model.mesh.ls, 1)  # Origin point
-    p2 = build.addPoint(0, settings.model.geometry.radius, 0, settings.model.mesh.ls, 2)  # Point along rotation axis
-    p3 = build.addPoint(0, 0, settings.model.geometry.radius, settings.model.mesh.ls,
-                        3)  # Point perpendicular up to rotation axis
+    p1 = build.addPoint(0, 0, 0, settings.model.mesh.ls, 1)
+    p2 = build.addPoint(0, settings.model.geometry.radius, 0, settings.model.mesh.ls, 2)
+    p3 = build.addPoint(0, 0, settings.model.geometry.radius, settings.model.mesh.ls, 3)
 
     l1 = build.addLine(p1, p2, 1)
-    l2 = build.addCircleArc(p2, p1, p3, 2)  # Lower circle arc of breast
-    l3 = build.addLine(p3, p1, 3)  # Line perpendicular up to rotation axis
+    l2 = build.addCircleArc(p2, p1, p3, 2)
+    l3 = build.addLine(p3, p1, 3)
 
     loop1 = build.addCurveLoop([l1, l2, l3], 1)
     s1 = build.addPlaneSurface([loop1], 1)
 
     p4 = build.addPoint(0, -settings.model.geometry.left_position_ellipse, 0, settings.model.mesh.ls, 4)
     p5 = build.addPoint(0, settings.model.geometry.radius + settings.model.geometry.position_nipple, 0, settings.model.mesh.ls, 5)
-    p6 = build.addPoint(0, (settings.model.geometry.radius + settings.model.geometry.position_nipple - settings.model.geometry.left_position_ellipse) / 2,
-                        -settings.model.geometry.position_center_ellipse,
-                        settings.model.mesh.ls, 6)
+    p6 = build.addPoint(
+        0,
+        (settings.model.geometry.radius + settings.model.geometry.position_nipple -
+         settings.model.geometry.left_position_ellipse) / 2,
+        -settings.model.geometry.position_center_ellipse,
+        settings.model.mesh.ls,
+        6,
+    )
 
     l4 = build.addEllipseArc(p4, p6, p5, p5, 4)
     l5 = build.addLine(p4, p5, 5)
@@ -74,7 +57,7 @@ def generate_mesh(settings: Settings()):
     loop2 = build.addCurveLoop([l4, l5], 2)
     s2 = build.addPlaneSurface([loop2], 2)
 
-    # Add back side breast
+    # Back side
     p7 = build.addPoint(0, -settings.model.geometry.thickness_chest_wall, settings.model.geometry.radius, settings.model.mesh.ls, 7)
     p8 = build.addPoint(0, -settings.model.geometry.thickness_chest_wall, 0, settings.model.mesh.ls, 8)
 
@@ -85,156 +68,126 @@ def generate_mesh(settings: Settings()):
     loop3 = build.addCurveLoop(([l8, l3, l6, l7]))
     s3 = build.addPlaneSurface([loop3])
 
-    # Fragment entire mesh in different regions (Assigns news points to intersection of curves)
     build.fragment([(dim2, s1), (dim2, s2)], [(dim2, s3)])
 
-    # Get indices of all (including newly formed due to fragment) objects
+    #############################
+    # Rebuild geometry cleanup  #
+    #############################
+
     all_points = build.getEntities(dim0)
     all_lines = build.getEntities(dim1)
     all_surfaces = build.getEntities(dim2)
 
-    # Name all points with convention p{tag}
-    for i in range(len(all_points)):
-        idx = all_points[i][1]
-        globals()['p%s' % idx] = idx
+    for _, idx in all_points:
+        globals()[f"p{idx}"] = idx
 
-    # Name all lines with convention l{tag}
-    for i in range(len(all_lines)):
-        idx = all_lines[i][1]
-        globals()['l%s' % idx] = idx
+    for _, idx in all_lines:
+        globals()[f"l{idx}"] = idx
 
-    # Remove all surfaces as we will be rebuilding them
     build.remove(all_surfaces)
-    # Remove all points that we will not need anymore. Note, first we remove the lines, then the points,
-    # as lines are constructed by connecting points
+
     build.remove(
-        [(dim1, l3), (dim1, l4), (dim1, l5), (dim1, l7), (dim1, l8), (dim1, l9), (dim1, l11), (dim1, l12),
-         (dim1, l14)])
+        [(dim1, l3), (dim1, l4), (dim1, l5), (dim1, l7),
+         (dim1, l8), (dim1, l9), (dim1, l11), (dim1, l12), (dim1, l14)]
+    )
+
     build.remove([(dim0, p6), (dim0, p10), (dim0, p12), (dim0, p14)])
 
-    # Add lines to complete reconstruction
     l3 = build.addLine(p16, p13, 3)
     l4 = build.addLine(p8, p15, 4)
 
     ###############################################
-    # Construct 3D geometry by revolving quadrant #
+    # Revolve into 3D
     ###############################################
 
-    # Get all lines and revolves around major axis
-    all_current_lines = build.getEntities(dim1)
-    build.revolve(all_current_lines, 0, 0, 0, 0, 1, 0, 2 * math.pi)
+    build.revolve(build.getEntities(dim1), 0, 0, 0, 0, 1, 0, 2 * math.pi)
 
-    # Alias for tissues. Only includes tissues, no nodes
     tissues = mesh_parts.tissue_parts
 
-    # Construct and assign surfaces and volumes for different tissues
     surfloop_gland = build.addSurfaceLoop([1, 2, 5])
     surfloop_fat = build.addSurfaceLoop([1, 2, 3, 4, 6])
 
-    # Surface tags for skin and chest
     tissues.skin.tags = [9, 10]
     tissues.chest.tags = 11
     tissues.glandular.tags = build.addVolume([surfloop_gland])
     tissues.adipose.tags = build.addVolume([surfloop_fat])
 
-    # Remove lingering elements
     build.fragment([(dim3, 1)], [(dim3, 2)])
     build.remove(build.getEntities(dim2))
     build.remove(build.getEntities(dim1))
     build.remove(build.getEntities(dim0))
 
-    # Synchronize the geometry before assigning meshing
     build.synchronize()
 
     ####################
-    # Generate 3D mesh #
+    # Generate mesh
     ####################
 
-    # Assign global mesh density by scaling mesh with length of mesh curves
-    curve_list = build.getEntities(dim1)
-    for curve in curve_list:
-        length_curve = build.getMass(dim1, curve[1])
-        mesh.setTransfiniteCurve(curve[1], int(settings.model.mesh.density * length_curve))
+    for curve in build.getEntities(dim1):
+        length = build.getMass(dim1, curve[1])
+        mesh.setTransfiniteCurve(curve[1], int(settings.model.mesh.density * length))
 
-    # Generate mesh up to 3D, set to predefined mesh order, and optionally optimize
     mesh.generate(dim3)
     mesh.setOrder(settings.model.mesh.order)
+
     if settings.model.mesh.optimize:
-        if settings.model.mesh.order == 1:
-            mesh.optimize()
-        else:
-            mesh.optimize("HighOrder")
+        mesh.optimize("HighOrder" if settings.model.mesh.order > 1 else "")
 
-    # =============================
-    # MESH VALIDATION (ADDED - Daan)
-    # =============================
+    #############################
+    # MESH VALIDATION
+    #############################
 
-    print("\n--- MESH QUALITY CHECK ---")
+    logger.info("--- MESH QUALITY CHECK ---") # does not work yet for all loggers
 
-    try:
-        jacobians = gmsh.model.mesh.getJacobians()[0]
-        min_jac = float(min(jacobians))
-    except Exception as e:
-        print(f"Jacobian check failed: {e}")
-        min_jac = None
+    min_jac = None
+    min_q = None
 
     try:
-        qualities = gmsh.model.mesh.getElementQualities()
-        min_q = float(min(qualities)) if qualities else None
+        elem_types, elem_tags, _ = mesh.getElements(dim3)
+        jacobians, _, _ = mesh.getJacobians(elem_types[0], elem_tags[0])
+        min_jac = float(np.min(jacobians))
     except Exception as e:
-        print(f"Quality check failed: {e}")
-        min_q = None
+        logger.warning(f"Jacobian check failed: {e}")
 
-    print(f"Min Jacobian: {min_jac}")
-    print(f"Min Element Quality: {min_q}")
+    try:
+        qualities = mesh.getElementQualities()
+        if qualities:
+            qualities = np.array(qualities)
+            min_q = float(np.min(qualities))
+            mean_q = float(np.mean(qualities))
+            bad_ratio = float(np.sum(qualities < 0.1) / len(qualities))
 
-    # HARD FAIL CONDITION
-    if min_jac is not None and min_jac <= 0:
-        raise ValueError(f"❌ Invalid mesh! Negative Jacobian detected: {min_jac}")
+            logger.info(f"Min quality: {min_q}")
+            logger.info(f"Mean quality: {mean_q}")
+            logger.info(f"Bad elements (<0.1): {bad_ratio*100:.2f}%")
+    except Exception as e:
+        logger.warning(f"Quality check failed: {e}")
+
+    if min_jac is not None:
+        logger.info(f"Min Jacobian: {min_jac}")
+        if min_jac <= 0:
+            raise ValueError(f"Invalid mesh: negative Jacobian ({min_jac})")
 
     if min_q is not None and min_q < 0.05:
-        print("⚠️ Warning: very low element quality")
-
-    # Here we loop over the tissues and assign the nodes, elements, etc. to the different fields.
-    for name in tissues.model_fields:
-        if getattr(tissues, name).dim == 2:
-            getattr(tissues, name).type = settings.model.mesh.elem_type_surface
-        else:
-            getattr(tissues, name).type = settings.model.mesh.elem_type_volume
-
-        tags = getattr(tissues, name).tags
-
-        if type(tags) == list:
-            elements = []
-            nodes = []
-            for tag in tags:
-                elements.append(mesh.getElements(getattr(tissues, name).dim, tag)[1][0])
-                nodes.append(mesh.getElements(getattr(tissues, name).dim, tag)[2][0])
-            elements = [int(item) for sublist in elements for item in sublist]
-            nodes = np.array([int(item) for sublist in nodes for item in sublist])
-            element_type = mesh.getElements(getattr(tissues, name).dim, tag)[0][0]
-            num_nodes = int(mesh.getElementProperties(element_type)[3])
-            getattr(tissues, name).elements = elements
-            getattr(tissues, name).nodes = nodes.reshape(-1, num_nodes)
-        else:
-            element_type, elements, nodes = mesh.getElements(getattr(tissues, name).dim, getattr(tissues, name).tags)
-            num_nodes = mesh.getElementProperties(element_type[0])[3]
-            getattr(tissues, name).elements = elements[0]
-            getattr(tissues, name).nodes = nodes[0].reshape(-1, num_nodes)
+        logger.warning("Very low element quality detected")
 
     #########################################
-    # Extract all nodes and prep for output #
+    # Extract nodes
     #########################################
 
-    # Get coordinates of nodes with their tag
-    node_tags, node_coords = gmsh.model.mesh.getNodes(returnParametricCoord=False)[0:2]
+    node_tags, node_coords = gmsh.model.mesh.getNodes()[0:2]
     node_coords = np.reshape(node_coords, (-1, 3))
 
-    # The node Tags need to be properly ascending in the .feb file
     sorted_ids = node_tags.argsort()
     mesh_parts.nodes.tags = node_tags[sorted_ids]
     mesh_parts.nodes.coords = node_coords[sorted_ids]
 
+    gmsh.write(str(Path("output") / "test_mesh.msh"))
+
     gmsh.finalize()
 
+
     return mesh_parts
+
+if __name__ == "__main__":
+    generate_mesh()
