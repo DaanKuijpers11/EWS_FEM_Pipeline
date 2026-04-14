@@ -439,34 +439,64 @@ def write_nodes_to_xml(parent, mesh):
 
 def write_elements_to_xml(parent, mesh):
     """
-    Reads the elements per tissue type [skin, glandular, adipose and chest] from generate_mesh.py and writes them to
-    the .feb file.
-
-    An important detail is that for tet10 elements, the node order per element is different between gmsh and FEBio.
-    This implies that some nodes' indices need to be manually adjusted to ensure proper element-node order.
-    The nodes that need to be adjusted are indices 9 <-> 10 (Python index 8 <-> 9). See code below.
+    Writes FEM elements per tissue type to FEBio XML.
     """
+
+    if mesh.tissue_parts is None:
+        raise ValueError(
+            "mesh.tissue_parts is None. "
+            "You must assign tissue_parts in generate_mesh()."
+        )
+
     tissues = mesh.tissue_parts
-    # This order must remain fixed
+
     for name in ["skin", "glandular", "adipose", "chest"]:
-        tissue = getattr(tissues, name)
 
+        tissue = getattr(tissues, name, None)
+
+        if tissue is None:
+            raise ValueError(f"Tissue '{name}' is missing in mesh.tissue_parts")
+
+        # --------------------------
+        # Chest = surface
+        # --------------------------
         if name == "chest":
-            elem_elem = ET.SubElement(parent, 'Surface', name=tissue.name)
-            for i in range(len(tissue.elements)):
-                tag = str(int(i + 1))
-                nodes_str = ",".join([f"{n}" for n in tissue.nodes[i]])
-                ET.SubElement(elem_elem, tissue.type, id=tag).text = nodes_str
+            elem_elem = ET.SubElement(parent, "Surface", name=tissue.name)
 
-        else:
-            elem_elem = ET.SubElement(parent, 'Elements', type=tissue.type, name=tissue.name)
+            if tissue.elements is None:
+                continue
+
             for i in range(len(tissue.elements)):
-                tag = str(tissue.elements[i])
-                if tissue.type == "tet10":
-                    # Switch tet10 node order when converting from gmsh to FEBio
-                    tissue.nodes[i][8], tissue.nodes[i][9] = tissue.nodes[i][9], tissue.nodes[i][8]
-                nodes_str = ",".join([f"{n}" for n in tissue.nodes[i]])
-                ET.SubElement(elem_elem, "elem", id=tag).text = nodes_str
+                tag = str(i + 1)
+
+                nodes = tissue.nodes[i] if tissue.nodes is not None else []
+                nodes_str = ",".join(map(str, nodes))
+
+                ET.SubElement(elem_elem, tissue.type or "tri3", id=tag).text = nodes_str
+
+        # --------------------------
+        # Solid tissues
+        # --------------------------
+        else:
+            elem_elem = ET.SubElement(parent, "Elements",
+                                     type=tissue.type or "tet4",
+                                     name=tissue.name or name)
+
+            if tissue.elements is None:
+                continue
+
+            for i in range(len(tissue.elements)):
+
+                elem_id = tissue.elements[i]
+                nodes = tissue.nodes[i]
+
+                # safety for tet10 swap
+                if tissue.type == "tet10" and len(nodes) > 9:
+                    nodes[8], nodes[9] = nodes[9], nodes[8]
+
+                nodes_str = ",".join(map(str, nodes))
+
+                ET.SubElement(elem_elem, "elem", id=str(elem_id)).text = nodes_str
 
 
 class TimeStepperSettingsStep1(ExtendedBaseModel):
@@ -808,7 +838,7 @@ def write_xml(root, filepath: Path):
     filepath_feb = Path(parent_path / filepath.stem).with_suffix(".feb")
     tree = ET.ElementTree(root)
     ET.indent(tree, space="\t", level=0)
-    tree.write(filepath_feb, encoding="ISO-8859-1")
+    tree.write(str(filepath_feb), encoding="ISO-8859-1")
 
     return filepath_feb
 

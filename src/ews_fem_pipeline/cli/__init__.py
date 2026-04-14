@@ -56,6 +56,7 @@ def generate(input_files: tuple[Path, ...]):
     for reproducing purposes. This .toml is placed in the subdirectory "/output".
     """
     
+    print("USING NEW CODE VERSION!!!")
     click.echo("\nStarting mesh generation...")
 
     feb_files = []

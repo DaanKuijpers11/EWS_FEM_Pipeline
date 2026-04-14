@@ -11,9 +11,10 @@ Outputs:
 
 from pathlib import Path
 import pandas as pd
-import helper_functions as helper
-import visualization as viz
-import config
+from . import helper_functions as helper
+from . import visualization as viz
+from . import config
+from .mesh_stability_analysis import run_mesh_analysis
 
 if __name__ == "__main__":
     """
@@ -160,7 +161,5 @@ if __name__ == "__main__":
 
 
 # Additional analysis: mesh stability and quality metrics
-
-from mesh_stability_analysis import analyze_meshes
-
-analyze_meshes(config.MODELS_TO_COMPARE)
+if __name__ == "__main__":
+    run_mesh_analysis()

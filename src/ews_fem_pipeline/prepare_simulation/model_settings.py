@@ -1,5 +1,6 @@
+from typing import Optional, Dict, Any
+import numpy as np
 from pydantic import BaseModel, Field
-
 
 class GeometrySettings(BaseModel):
     """
@@ -88,29 +89,66 @@ class MeshObject(BaseModel):
     dim: int = None
 
 
+# =========================
+# NODE STORAGE
+# =========================
 class Nodes(BaseModel):
-    """
-    Contains the fields of all the nodes.
-    """
-    tags: list = None
-    coords: list = None
+    """Stores mesh node information (tags + coordinates)."""
+
+    tags: np.ndarray = Field(default_factory=lambda: np.array([], dtype=int))
+    coords: np.ndarray = Field(default_factory=lambda: np.zeros((0, 3), dtype=float))
+
+    model_config = {"arbitrary_types_allowed": True}
 
 
-# Class containing all tissue components in breast
+# =========================
+# GENERIC MESH OBJECT
+# =========================
+class MeshObject(BaseModel):
+    """Represents a tissue region in the mesh."""
+
+    type: Optional[str] = None
+
+    # Element connectivity (FEBio-ready format)
+    elements: np.ndarray = Field(default_factory=lambda: np.zeros((0, 4), dtype=int))
+
+    # Node indices belonging to this tissue
+    nodes: np.ndarray = Field(default_factory=lambda: np.array([], dtype=int))
+
+    name: Optional[str] = None
+    tags: Optional[Any] = None
+    dim: Optional[int] = None
+
+    model_config = {"arbitrary_types_allowed": True}
+
+
+# =========================
+# TISSUE STRUCTURE
+# =========================
 class TissueParts(BaseModel):
-    """
-    Assigns the name and dimensionality to the mesh objects from MeshObject class
-    """
-    skin: MeshObject = MeshObject(name="skin_part", dim=2)
-    chest: MeshObject = MeshObject(name="chest_part", dim=2)
-    adipose: MeshObject = MeshObject(name="adipose_part", dim=3)
-    glandular: MeshObject = MeshObject(name="glandular_part", dim=3)
+    """Container for all breast tissue regions."""
+
+    skin: MeshObject = Field(default_factory=lambda: MeshObject(name="skin_part", dim=2))
+    chest: MeshObject = Field(default_factory=lambda: MeshObject(name="chest_part", dim=2))
+    adipose: MeshObject = Field(default_factory=lambda: MeshObject(name="adipose_part", dim=3))
+    glandular: MeshObject = Field(default_factory=lambda: MeshObject(name="glandular_part", dim=3))
+
+    model_config = {"arbitrary_types_allowed": True}
 
 
+# =========================
+# FULL MESH CONTAINER
+# =========================
 class MeshParts(BaseModel):
     """
-    Unites the nodes and the tissues parts for all tissues in a single class, for easier reference.
+    Main container for FEBio pipeline mesh data.
+    Guaranteed to never contain None references at runtime.
     """
-    nodes: Nodes = Nodes()
-    tissue_parts: TissueParts = TissueParts()
 
+    nodes: Nodes = Field(default_factory=Nodes)
+    tissue_parts: TissueParts = Field(default_factory=TissueParts)
+
+    # raw FEM connectivity (optional but safe)
+    elements: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = {"arbitrary_types_allowed": True}
